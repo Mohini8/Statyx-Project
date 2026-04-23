@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "ura7poqXv0pIOiv4VinHE"
+uri = "file://statyx-ai.zip"
+type = "unspecified"
+title = "Statyx AI — Full Source Code"

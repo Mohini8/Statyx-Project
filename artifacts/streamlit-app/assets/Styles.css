@@ -1,0 +1,272 @@
+/* ═══════════════════════════════════════════════════════════════
+   STATYX AI — STREAMLIT CUSTOM STYLES
+   Matches the React frontend's light blue/neutral design system
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Hide default Streamlit chrome */
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
+header { visibility: hidden; }
+.stDeployButton { display: none; }
+
+/* Main container */
+.main .block-container {
+    padding: 24px 32px 40px 32px;
+    max-width: 100%;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+}
+
+/* Remove default Streamlit top padding */
+.css-18e3th9 { padding-top: 0; }
+.css-1d391kg { padding-top: 12px; }
+
+/* Metrics */
+[data-testid="stMetric"] {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(30, 64, 175, 0.06);
+}
+
+[data-testid="stMetricLabel"] {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+[data-testid="stMetricValue"] {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1e40af;
+}
+
+/* DataFrames */
+[data-testid="stDataFrame"] {
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+/* Tabs */
+[data-testid="stTabs"] [role="tablist"] {
+    background: #f1f5f9;
+    border-radius: 10px;
+    padding: 4px;
+    gap: 2px;
+    border: none;
+}
+
+[data-testid="stTabs"] [role="tab"] {
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-weight: 500;
+    font-size: 14px;
+    color: #64748b;
+    border: none;
+    transition: all 0.15s ease;
+}
+
+[data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+    background: #ffffff;
+    color: #1e40af;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(30, 64, 175, 0.12);
+}
+
+/* Expanders */
+[data-testid="stExpander"] {
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+[data-testid="stExpander"] summary {
+    font-weight: 600;
+    color: #1e40af;
+    padding: 12px 16px;
+    background: #f8faff;
+}
+
+/* Buttons */
+[data-testid="stButton"] > button {
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 14px;
+    padding: 8px 20px;
+    transition: all 0.15s ease;
+    border: 1px solid #93c5fd;
+    color: #1d4ed8;
+    background: #eff6ff;
+}
+
+[data-testid="stButton"] > button:hover {
+    background: #dbeafe;
+    border-color: #60a5fa;
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.18);
+    transform: translateY(-1px);
+}
+
+[data-testid="stButton"] > button[kind="primary"] {
+    background: #1d4ed8;
+    color: white;
+    border: none;
+}
+
+[data-testid="stButton"] > button[kind="primary"]:hover {
+    background: #1e40af;
+}
+
+/* File uploader */
+[data-testid="stFileUploader"] {
+    background: #f8faff;
+    border: 2px dashed #93c5fd;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+    transition: border-color 0.2s;
+}
+
+[data-testid="stFileUploader"]:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+/* Select boxes */
+[data-testid="stSelectbox"] > div > div {
+    border-radius: 8px;
+    border-color: #cbd5e1;
+    font-size: 14px;
+}
+
+/* Sliders */
+[data-testid="stSlider"] [data-baseweb="slider"] [role="slider"] {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+/* Progress */
+[data-testid="stProgress"] > div > div {
+    background: #1d4ed8;
+}
+
+/* Alerts */
+[data-testid="stAlert"] {
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+/* Info messages */
+.element-container .stAlert[data-type="info"] {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    color: #1e40af;
+}
+
+/* Success messages */
+.element-container .stAlert[data-type="success"] {
+    background: #f0fdf4;
+    border-left: 4px solid #22c55e;
+}
+
+/* Warning messages */
+.element-container .stAlert[data-type="warning"] {
+    background: #fffbeb;
+    border-left: 4px solid #f59e0b;
+}
+
+/* Horizontal rule */
+hr {
+    border: none;
+    border-top: 1px solid #e2e8f0;
+    margin: 20px 0;
+}
+
+/* Plotly charts */
+.js-plotly-plot .plotly .main-svg {
+    border-radius: 10px;
+}
+
+/* Spinner */
+[data-testid="stSpinner"] {
+    color: #1d4ed8;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+/* Download button */
+[data-testid="stDownloadButton"] > button {
+    background: #1d4ed8;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+/* Sidebar (hidden but keeping styling) */
+[data-testid="stSidebar"] {
+    display: none;
+}
+
+/* Remove streamlit header decoration */
+.stApp > header {
+    display: none;
+}
+
+/* Body bg */
+.stApp {
+    background: #f8fafc;
+}
+
+/* Main page bg */
+.main {
+    background: #f8fafc;
+}
+
+/* Radio buttons */
+[data-testid="stRadio"] > div {
+    flex-direction: row;
+    gap: 16px;
+}
+
+/* Multiselect */
+[data-baseweb="tag"] {
+    background: #dbeafe;
+    color: #1e40af;
+    border-radius: 6px;
+    font-size: 12px;
+}
+
+/* Link */
+a {
+    color: #1d4ed8;
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+}

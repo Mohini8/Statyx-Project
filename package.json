@@ -1,0 +1,23 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "dev:install": "pnpm install && cd artifacts/streamlit-app && pip install -r requirements.txt",
+    "dev": "concurrently \"pnpm --filter @workspace/api-server run dev\" \"BASE_PATH=/ PORT=5173 pnpm --filter @workspace/statyx-ai run dev\" \"cd artifacts/streamlit-app && python -m streamlit run app.py --server.port=8501 --server.headless=true --server.enableCORS=false --server.enableXsrfProtection=false\" \"cd artifacts/streamlit-app && python api.py\""
+  },
+  "private": true,
+  "devDependencies": {
+    "concurrently": "^7.0.0",
+    "lightningcss": "npm:lightningcss-wasm@^1.32.0",
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2"
+  },
+  "dependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.60.1"
+  }
+}

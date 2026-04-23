@@ -1,0 +1,328 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Statyx AI API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: datasets
+    description: Dataset management
+  - name: analytics
+    description: Analytics and statistics
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout user
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /datasets:
+    get:
+      operationId: listDatasets
+      tags: [datasets]
+      summary: List all datasets for the current user
+      responses:
+        "200":
+          description: List of datasets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Dataset"
+
+  /datasets/{id}:
+    get:
+      operationId: getDataset
+      tags: [datasets]
+      summary: Get a single dataset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Dataset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dataset"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteDataset
+      tags: [datasets]
+      summary: Delete a dataset
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /datasets/summary:
+    get:
+      operationId: getDatasetsSummary
+      tags: [datasets]
+      summary: Get summary stats about user's datasets
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatasetsSummary"
+
+  /streamlit-url:
+    get:
+      operationId: getStreamlitUrl
+      tags: [analytics]
+      summary: Get Streamlit server URL for analytics embedding
+      responses:
+        "200":
+          description: Streamlit URL info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StreamlitUrlResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    RegisterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - name
+        - email
+        - password
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - name
+        - email
+        - createdAt
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        message:
+          type: string
+      required:
+        - user
+        - message
+
+    Dataset:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        fileName:
+          type: string
+        fileSize:
+          type: integer
+        rowCount:
+          type: ["integer", "null"]
+        columnCount:
+          type: ["integer", "null"]
+        status:
+          type: string
+          enum: [processing, ready, error]
+        uploadedAt:
+          type: string
+      required:
+        - id
+        - name
+        - fileName
+        - fileSize
+        - status
+        - uploadedAt
+
+    DatasetsSummary:
+      type: object
+      properties:
+        totalDatasets:
+          type: integer
+        totalRows:
+          type: integer
+        recentUploads:
+          type: integer
+        readyDatasets:
+          type: integer
+      required:
+        - totalDatasets
+        - totalRows
+        - recentUploads
+        - readyDatasets
+
+    StreamlitUrlResponse:
+      type: object
+      properties:
+        url:
+          type: string
+        available:
+          type: boolean
+      required:
+        - url
+        - available

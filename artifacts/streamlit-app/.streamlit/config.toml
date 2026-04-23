@@ -1,0 +1,21 @@
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = false
+port = 8501
+baseUrlPath = "streamlit"
+
+[browser]
+serverAddress = "0.0.0.0"
+gatherUsageStats = false
+
+[theme]
+base = "light"
+primaryColor = "#1d4ed8"
+backgroundColor = "#f8fafc"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#0f172a"
+font = "sans serif"
+
+[logger]
+level = "error"
