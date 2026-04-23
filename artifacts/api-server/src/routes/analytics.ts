@@ -4,7 +4,8 @@ const router: IRouter = Router();
 
 router.get("/streamlit-url", async (req, res): Promise<void> => {
   const replDomain = process.env.REPLIT_DEV_DOMAIN;
-  
+  const streamlitUrl = process.env.STREAMLIT_URL ?? "/streamlit";
+
   if (replDomain) {
     res.json({
       url: `https://${replDomain}/streamlit`,
@@ -12,7 +13,7 @@ router.get("/streamlit-url", async (req, res): Promise<void> => {
     });
   } else {
     res.json({
-      url: "/streamlit",
+      url: streamlitUrl,
       available: true,
     });
   }
