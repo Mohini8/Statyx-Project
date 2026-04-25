@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -108,7 +108,8 @@ function renderTable(rows: DatasetRow[], columns: string[]) {
 }
 
 export default function Analytics() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const search = useSearch();
   const [page, setPage] = useState<string>("upload");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,10 +142,21 @@ export default function Analytics() {
   const [reportStatus, setReportStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const currentPage = searchParams.get("page") || "upload";
+    if (location.startsWith("/dashboard/analytics/")) {
+      const moduleFromPath = location.replace("/dashboard/analytics/", "") || "upload";
+      setPage(moduleFromPath);
+      return;
+    }
+
+    const currentPage = new URLSearchParams(search).get("page") || "upload";
     setPage(currentPage);
-  }, [window.location.search]);
+  }, [location, search]);
+
+  useEffect(() => {
+    if (location === "/dashboard/analytics") {
+      setLocation("/dashboard/analytics/upload");
+    }
+  }, [location, setLocation]);
 
   useEffect(() => {
     if (datasetColumns.length > 0 && visualizationColumns.length === 0) {
@@ -1693,7 +1705,7 @@ export default function Analytics() {
               <Button
                 key={tab}
                 variant={tab === page ? "secondary" : "ghost"}
-                onClick={() => setLocation(`/dashboard/analytics?page=${tab}`)}
+                onClick={() => setLocation(`/dashboard/analytics/${tab}`)}
                 size="sm"
               >
                 {TABS[tab].title}

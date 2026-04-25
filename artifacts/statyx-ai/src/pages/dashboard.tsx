@@ -148,14 +148,14 @@ export default function Dashboard() {
             <p className="text-muted-foreground text-sm max-w-sm mb-6">
               Upload your first dataset to start cleaning, analyzing, and generating insights with Statyx AI.
             </p>
-            <Link href="/dashboard/analytics?page=upload">
+            <Link href="/dashboard/analytics/upload">
               <Button>Upload your first dataset</Button>
             </Link>
           </Card>
         ) : (
           <div className="grid gap-3">
             {datasets?.slice(0, 5).map((dataset) => (
-              <Link key={dataset.id} href={`/dashboard/analytics?page=statistics`}>
+              <Link key={dataset.id} href={`/dashboard/analytics/statistics`}>
                 <Card className="border-border/50 shadow-sm hover:shadow-md transition-all cursor-pointer hover:border-primary/30 group">
                   <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center space-x-4">

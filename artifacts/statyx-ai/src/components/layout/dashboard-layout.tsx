@@ -20,13 +20,13 @@ import { useState } from "react";
 
 const NAV_ITEMS = [
   { path: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
-  { path: "/dashboard/analytics?page=upload", label: "Upload Data", icon: UploadCloud },
-  { path: "/dashboard/analytics?page=clean", label: "Data Cleaning", icon: Wand2 },
-  { path: "/dashboard/analytics?page=statistics", label: "Statistics", icon: BarChart3 },
-  { path: "/dashboard/analytics?page=visualizations", label: "Visualizations", icon: LineChart },
-  { path: "/dashboard/analytics?page=ai-analysis", label: "AI Analysis", icon: BrainCircuit },
-  { path: "/dashboard/analytics?page=cross-tabulation", label: "Cross Tabulation", icon: Network },
-  { path: "/dashboard/analytics?page=reports", label: "Reports", icon: FileText },
+  { path: "/dashboard/analytics/upload", label: "Upload Data", icon: UploadCloud },
+  { path: "/dashboard/analytics/clean", label: "Data Cleaning", icon: Wand2 },
+  { path: "/dashboard/analytics/statistics", label: "Statistics", icon: BarChart3 },
+  { path: "/dashboard/analytics/visualizations", label: "Visualizations", icon: LineChart },
+  { path: "/dashboard/analytics/ai-analysis", label: "AI Analysis", icon: BrainCircuit },
+  { path: "/dashboard/analytics/cross-tabulation", label: "Cross Tabulation", icon: Network },
+  { path: "/dashboard/analytics/reports", label: "Reports", icon: FileText },
 ];
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -63,10 +63,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           if (isOverview) {
             isActive = location === "/dashboard";
           } else {
-            const searchParams = new URLSearchParams(window.location.search);
-            const page = searchParams.get('page');
-            const itemPage = new URLSearchParams(item.path.split('?')[1]).get('page');
-            isActive = location.startsWith("/dashboard/analytics") && page === itemPage;
+           isActive = location === item.path;
           }
 
           return (
