@@ -90,12 +90,12 @@ export async function generateVisualization(rows: DatasetRow[], chartType: strin
   );
 }
 
-export async function runAiInsights(rows: DatasetRow[], objective: string) {
-  return request<{ insights: any[]; tests: any[]; columns: string[] }>(
+export async function runAiInsights(rows: DatasetRow[], objective: string, options?: { targetCol?: string; groupCol?: string; additionalTests?: string[] }) {
+  return request<{ insights: any[]; tests: any[]; additionalTests: any[]; additionalTestResults: any[]; target?: string; group?: string; columns: string[] }>(
     "/api/python/ai/insights",
     {
       method: "POST",
-      body: JSON.stringify({ rows, objective }),
+      body: JSON.stringify({ rows, objective, target_col: options?.targetCol, group_col: options?.groupCol, additional_tests: options?.additionalTests ?? [] }),
     },
   );
 }

@@ -132,7 +132,10 @@ export default function Analytics() {
   const [visualizationColumns, setVisualizationColumns] = useState<string[]>([]);
 
   const [objective, setObjective] = useState<string>("");
-  const [aiResult, setAiResult] = useState<{ insights: any[]; tests: any[] } | null>(null);
+  const [aiTarget, setAiTarget] = useState<string>("auto");
+  const [aiGroup, setAiGroup] = useState<string>("auto");
+  const [selectedAdditionalTests, setSelectedAdditionalTests] = useState<string[]>([]);
+  const [aiResult, setAiResult] = useState<{ insights: any[]; tests: any[]; additionalTests: any[]; additionalTestResults: any[]; target?: string; group?: string } | null>(null);
 
   const [crossRow, setCrossRow] = useState<string>("");
   const [crossCol, setCrossCol] = useState<string>("");
@@ -507,11 +510,36 @@ export default function Analytics() {
     setError(null);
     setLoading(true);
     try {
-      const result = await runAiInsights(datasetRows, objective);
-      setAiResult({ insights: result.insights, tests: result.tests });
+      const result = await runAiInsights(datasetRows, objective, {
+        targetCol: aiTarget === "auto" ? undefined : aiTarget,
+        groupCol: aiGroup === "auto" ? undefined : aiGroup,
+        additionalTests: [],
+      });
+      setSelectedAdditionalTests([]);
+      setAiResult({ insights: result.insights, tests: result.tests, additionalTests: result.additionalTests || [], additionalTestResults: [], target: result.target, group: result.group });
       setSuccess("AI analysis completed.");
     } catch (err: any) {
       setError(err.message || "AI analysis failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  const handleRunAdditionalAiTests = async () => {
+    if (!datasetLoaded || !aiResult || selectedAdditionalTests.length === 0) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await runAiInsights(datasetRows, objective, {
+        targetCol: aiResult.target,
+        groupCol: aiResult.group,
+        additionalTests: selectedAdditionalTests,
+      });
+      setAiResult((prev) => prev ? { ...prev, additionalTestResults: result.additionalTestResults || [] } : prev);
+      setSuccess("Selected additional tests executed.");
+    } catch (err: any) {
+      setError(err.message || "Failed to run additional tests.");
     } finally {
       setLoading(false);
     }
@@ -1182,12 +1210,29 @@ export default function Analytics() {
                       />
                       <p className="mt-2 text-xs text-muted-foreground">Describe your analysis objective in natural language for AI-powered test recommendations.</p>
                     </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Target column (optional)</label>
+                        <select value={aiTarget} onChange={(event) => setAiTarget(event.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                          <option value="auto">Auto infer</option>
+                          {datasetColumns.map((column) => (<option key={column} value={column}>{column}</option>))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Relevant/group column (optional)</label>
+                        <select value={aiGroup} onChange={(event) => setAiGroup(event.target.value)} className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                          <option value="auto">Auto infer</option>
+                          {datasetColumns.map((column) => (<option key={column} value={column}>{column}</option>))}
+                        </select>
+                      </div>
+                    </div>
                     <Button onClick={handleRunAiAnalysis} disabled={loading}>
                       <BrainCircuit className="mr-2 h-4 w-4" /> Run Suggested Tests
                     </Button>
 
                     {aiResult && (
                       <div className="space-y-6 mt-6 border-t border-border pt-6">
+                        <div className="rounded-lg border border-border bg-background p-3 text-sm">Selected columns → target: <strong>{aiResult.target || "N/A"}</strong>, group: <strong>{aiResult.group || "N/A"}</strong></div>
                         {aiResult.insights && aiResult.insights.length > 0 && (
                           <div className="rounded-xl border border-border bg-card p-4">
                             <h3 className="text-lg font-semibold mb-4">📊 AI Insights</h3>
@@ -1277,6 +1322,38 @@ export default function Analytics() {
                                 </div>
                               );
                             })}
+                          </div>
+                        )}
+
+                        {aiResult.additionalTests && aiResult.additionalTests.length > 0 && (
+                          <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+                            <h3 className="text-lg font-semibold">Additional Possible Tests</h3>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {aiResult.additionalTests.map((item, idx) => (
+                                <label key={`${item.test_key}-${idx}`} className="flex items-center gap-2 text-sm">
+                                  <input type="checkbox" checked={selectedAdditionalTests.includes(item.test_key)} onChange={(event) => setSelectedAdditionalTests((prev) => event.target.checked ? [...prev, item.test_key] : prev.filter((x) => x !== item.test_key))} />
+                                  <span>{item.test_key} ({(item.confidence * 100).toFixed(1)}%)</span>
+                                </label>
+                              ))}
+                            </div>
+                            <Button onClick={handleRunAdditionalAiTests} disabled={loading || selectedAdditionalTests.length === 0}>Run Selected Additional Tests</Button>
+                          </div>
+                        )}
+
+                        {aiResult.additionalTestResults && aiResult.additionalTestResults.length > 0 && (
+                          <div className="space-y-4">
+                            <h3 className="text-lg font-semibold">Executed Additional Tests</h3>
+                            {aiResult.additionalTestResults.map((test, idx) => (
+                              <div key={`extra-${idx}`} className="rounded-xl border border-border bg-card p-4">
+                                <h4 className="font-semibold mb-2">{test.test}</h4>
+                                <div className="overflow-x-auto">
+                                  <table className="min-w-full text-sm border border-border rounded-lg">
+                                    <thead className="bg-muted text-muted-foreground"><tr><th className="px-3 py-2 text-left font-medium">Metric</th><th className="px-3 py-2 text-left font-medium">Value</th></tr></thead>
+                                    <tbody>{Object.entries(test.result || {}).map(([key, value]) => (<tr key={key} className="border-t border-border"><td className="px-3 py-2 font-medium text-foreground">{key}</td><td className="px-3 py-2 text-foreground">{String(value)}</td></tr>))}</tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
 

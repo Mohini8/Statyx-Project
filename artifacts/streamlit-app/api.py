@@ -24,17 +24,41 @@ from services.Report_Service import generate_pdf_report, generate_word_report
 from services.cross_tab_service import cross_tab_analysis
 from services.visualization_service import generate_plot
 from utils.Dataframe_Utils import load_dataframe
+from ai.objective_engine import analyze_objective
+from stats.stats_tests import TEST_REGISTRY
 
 MODEL = SentenceTransformer("intfloat/e5-base")
 TEST_DESCRIPTIONS = {
     "independent_t_test": "compare mean of a continuous variable between two independent groups",
+    "paired_t_test": "compare mean before and after intervention on same subjects",
+    "one_sample_t_test": "compare mean against known population value",
     "anova": "compare mean across more than two groups",
+    "anova_rm": "compare repeated measurements",
+    "mann_whitney_u": "nonparametric comparison between two independent groups",
+    "kruskal_wallis": "nonparametric comparison across multiple groups",
     "chi_square": "association between two categorical variables",
-    "pearson_correlation": "linear correlation between two numeric variables",
+    "fisher_exact": "association between two binary variables",
+    "chisquare_gof": "goodness of fit test",
+    "mcnemar_test": "paired categorical association",
+    "cochran_q": "compare proportions across repeated groups",
+    "pearson_correlation": "linear correlation",
+    "spearman_correlation": "rank based correlation",
+    "kendall_tau": "ordinal association",
+    "mutual_information": "nonlinear dependency",
+    "linear_regression": "predict continuous outcome",
+    "logistic_regression": "predict binary outcome",
+    "poisson_regression": "model count outcome",
+    "probit_regression": "binary outcome with probit",
+    "cohens_d": "effect size",
+    "hedges_g": "bias corrected effect size",
+    "phi_coefficient": "binary association",
+    "cramers_v": "categorical association strength",
+    "odds_ratio": "odds comparison",
+    "relative_risk": "risk comparison"
 }
 TEST_NAMES = list(TEST_DESCRIPTIONS.keys())
 TEST_TEXTS = [f"passage: {desc}" for desc in TEST_DESCRIPTIONS.values()]
-TEST_EMBEDDINGS = MODEL.encode(TEST_TEXTS, convert_to_numpy=True)
+TEST_EMBEDDINGS = MODEL.encode(TEST_TEXTS, convert_to_tensor=True)
 
 app = FastAPI(title="Statyx Python Backend")
 app.add_middleware(
@@ -66,6 +90,9 @@ class CleanRequest(DatasetPayload):
 
 class AiRequest(DatasetPayload):
     objective: Optional[str] = None
+    target_col: Optional[str] = None
+    group_col: Optional[str] = None
+    additional_tests: Optional[List[str]] = None
 
 
 class VisualizationRequest(DatasetPayload):
@@ -102,141 +129,46 @@ def encode_png(fig) -> str:
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-def compute_objective_tests(df: pd.DataFrame, objective: str) -> List[Dict[str, Any]]:
-    objective_embedding = MODEL.encode([f"passage: {objective}"], convert_to_numpy=True)[0]
-    scores = [
-        (name, float(np.dot(objective_embedding, TEST_EMBEDDINGS[i]) /
-                        (np.linalg.norm(objective_embedding) * np.linalg.norm(TEST_EMBEDDINGS[i]) + 1e-9)))
-        for i, name in enumerate(TEST_NAMES)
-    ]
-    scores.sort(key=lambda item: item[1], reverse=True)
+def compute_objective_tests(df: pd.DataFrame, objective: str, target_col: Optional[str] = None, group_col: Optional[str] = None, additional_tests: Optional[List[str]] = None) -> Dict[str, Any]:
+    objective_lower = objective.lower()
+    if not target_col or not group_col:
+        mentioned = [c for c in df.columns if c.lower().replace("_", " ") in objective_lower]
+        if len(mentioned) >= 2:
+            target_col = target_col or mentioned[0]
+            group_col = group_col or mentioned[1]
 
-    results = []
-    numeric_cols = list(df.select_dtypes(include=[np.number]).columns)
-    cat_cols = list(df.select_dtypes(include=["object", "category"]).columns)
+    result = analyze_objective(
+        df,
+        objective,
+        TEST_EMBEDDINGS,
+        TEST_NAMES,
+        target_col=target_col,
+        group_col=group_col,
+        max_attempts=50,
+    )
+    if result is None:
+        return {"top_tests": [], "additional_test_options": [], "additional_test_results": [], "target": target_col, "group": group_col}
 
-    def run_test(test_name: str, cols: tuple[str, str]) -> Optional[Dict[str, Any]]:
-        if test_name == "pearson_correlation":
-            x = df[cols[0]].dropna()
-            y = df[cols[1]].dropna()
-            if len(x) > 1 and len(y) > 1:
-                stat, p = stats.pearsonr(x, y)
-                return {
-                    "correlation": round(float(stat), 4),
-                    "p_value": round(float(p), 6),
-                    "interpretation": f"Pearson correlation between {cols[0]} and {cols[1]}"
-                }
+    top_tests, target, group, additional_options = result
 
-        if test_name == "chi_square":
-            contingency = pd.crosstab(df[cols[0]], df[cols[1]])
-            if contingency.shape[0] >= 2 and contingency.shape[1] >= 2:
-                chi2, p, _, _ = stats.chi2_contingency(contingency)
-                return {
-                    "chi2": round(float(chi2), 4),
-                    "p_value": round(float(p), 6),
-                    "interpretation": f"Chi-square test between {cols[0]} and {cols[1]}"
-                }
-
-        if test_name == "independent_t_test":
-            groups = df[[cols[0], cols[1]]].dropna().groupby(cols[1])[cols[0]]
-            if len(groups) == 2:
-                samples = [group.values for _, group in groups]
-                if len(samples[0]) > 1 and len(samples[1]) > 1:
-                    stat, p = stats.ttest_ind(samples[0], samples[1], equal_var=False)
-                    return {
-                        "statistic": round(float(stat), 6),
-                        "p_value": round(float(p), 6),
-                        "interpretation": f"Independent t-test comparing {cols[0]} across {cols[1]} groups"
-                    }
-
-        if test_name == "anova":
-            groups = df[[cols[0], cols[1]]].dropna().groupby(cols[1])[cols[0]]
-            if len(groups) >= 2:
-                samples = [group.values for _, group in groups]
-                if len(samples) >= 2 and all(len(sample) > 1 for sample in samples):
-                    stat, p = stats.f_oneway(*samples)
-                    return {
-                        "statistic": round(float(stat), 6),
-                        "p_value": round(float(p), 6),
-                        "interpretation": f"One-way ANOVA comparing {cols[0]} across {cols[1]} groups"
-                    }
-
-        return None
-
-    combination_map = {
-        "pearson_correlation": [(numeric_cols[i], numeric_cols[j]) for i in range(len(numeric_cols)) for j in range(i + 1, len(numeric_cols))],
-        "chi_square": [(cat_cols[i], cat_cols[j]) for i in range(len(cat_cols)) for j in range(i + 1, len(cat_cols))],
-        "independent_t_test": [(num, cat) for num in numeric_cols for cat in cat_cols],
-        "anova": [(num, cat) for num in numeric_cols for cat in cat_cols],
-    }
-
-    seen_tests = set()
-    for test_name, confidence in scores:
-        if test_name in ["cox_regression", "kaplan_meier"]:
+    additional_results: List[Dict[str, Any]] = []
+    for key in (additional_tests or []):
+        if key not in TEST_REGISTRY:
+            continue
+        try:
+            out = TEST_REGISTRY[key](df, target, group)
+            if isinstance(out, dict) and out:
+                additional_results.append({"test_key": key, "test": f"{key.replace('_', ' ').title()} ({target} vs {group})", "result": out})
+        except Exception:
             continue
 
-        for cols in combination_map.get(test_name, []):
-            try:
-                test_result = run_test(test_name, cols)
-                if test_result is None:
-                    continue
-
-                display_name = f"{test_name.replace('_', ' ').title()} ({cols[0]} vs {cols[1]})"
-                identifier = (test_name, cols)
-                if identifier in seen_tests:
-                    continue
-
-                results.append({
-                    "test": display_name,
-                    "confidence": round(float(confidence), 3),
-                    "result": test_result,
-                })
-                seen_tests.add(identifier)
-
-                if len(results) >= 5:
-                    break
-            except Exception:
-                continue
-
-        if len(results) >= 5:
-            break
-
-    if len(results) < 3:
-        for test_name in TEST_NAMES:
-            if test_name in ["cox_regression", "kaplan_meier"]:
-                continue
-            for cols in combination_map.get(test_name, []):
-                identifier = (test_name, cols)
-                if identifier in seen_tests:
-                    continue
-                try:
-                    test_result = run_test(test_name, cols)
-                    if test_result is None:
-                        continue
-                    confidence = next((score for name, score in scores if name == test_name), 0.0)
-                    display_name = f"{test_name.replace('_', ' ').title()} ({cols[0]} vs {cols[1]})"
-                    results.append({
-                        "test": display_name,
-                        "confidence": round(float(confidence), 3),
-                        "result": test_result,
-                    })
-                    seen_tests.add(identifier)
-                    if len(results) >= 3:
-                        break
-                except Exception:
-                    continue
-            if len(results) >= 3:
-                break
-
-    if not results:
-        results.append({
-            "test": "No suitable test found",
-            "confidence": 0.0,
-            "result": {"error": "Unable to infer an analysis from the current dataset."}
-        })
-
-    return results
-
+    return {
+        "top_tests": top_tests,
+        "additional_test_options": additional_options,
+        "additional_test_results": additional_results,
+        "target": target,
+        "group": group,
+    }
 
 @app.post("/api/python/upload")
 async def upload_dataset(file: UploadFile = File(...)) -> JSONResponse:
@@ -376,8 +308,14 @@ def ai_insights(request: AiRequest) -> JSONResponse:
     df = normalize_dataframe(pd.DataFrame(request.rows))
     insights = generate_auto_insights(df)
     objective = request.objective or ""
-    tests = compute_objective_tests(df, objective) if objective else []
-    return JSONResponse(content=jsonable_encoder({"insights": insights, "tests": tests, "columns": list(df.columns)}))
+    analysis = compute_objective_tests(
+        df,
+        objective,
+        request.target_col,
+        request.group_col,
+        request.additional_tests,
+    ) if objective else {"top_tests": [], "additional_test_options": [], "additional_test_results": [], "target": request.target_col, "group": request.group_col}
+    return JSONResponse(content=jsonable_encoder({"insights": insights, "tests": analysis["top_tests"], "additionalTests": analysis["additional_test_options"], "additionalTestResults": analysis["additional_test_results"], "target": analysis["target"], "group": analysis["group"], "columns": list(df.columns)}))
 
 
 @app.post("/api/python/cross-tab")
