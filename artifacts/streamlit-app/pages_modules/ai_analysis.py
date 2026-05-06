@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 from ai.embedding_model import model
-from services.ai_service import run_ai_analysis
+from ai.objective_engine import analyze_objective
 
 
 
@@ -42,20 +42,27 @@ def render():
         "Enter objective (e.g., 'Is outcome associated with gender?')"
     )
 
+    target_col = st.selectbox("Target column (optional override)", ["Auto"] + list(df.columns), index=0)
+    group_col = st.selectbox("Relevant column/group (optional override)", ["Auto"] + list(df.columns), index=0)
+
     if st.button("Run Suggested Tests"):
 
-        result = run_ai_analysis(
+        result = analyze_objective(
             df,
             objective,
             TEST_EMBEDDINGS,
-            TEST_NAMES
+            TEST_NAMES,
+            None if target_col == "Auto" else target_col,
+            None if group_col == "Auto" else group_col
         )
 
         if result is None:
             st.error("Could not infer columns")
             st.stop()
 
-        valid_results, target, group = result
+        valid_results, target, group, additional_tests = result
+
+        st.info(f"Selected columns → target: **{target}**, relevant/group: **{group}**")
 
         for test in valid_results:
 
@@ -77,6 +84,31 @@ def render():
 
                 else:
                     st.warning("No statistically significant relationship")
+
+        st.markdown("### Additional Possible Tests")
+        if additional_tests:
+            available_options = [
+                f"{item['test_key']} (confidence={item['confidence']})"
+                for item in additional_tests
+            ]
+            selected = st.multiselect(
+                "Select any additional tests to execute",
+                options=available_options
+            )
+
+            if st.button("Run Selected Additional Tests"):
+                for label in selected:
+                    selected_key = label.split(" (confidence=")[0]
+                    try:
+                        from stats.stats_tests import TEST_REGISTRY
+                        res = TEST_REGISTRY[selected_key](df, target, group)
+                        if isinstance(res, dict):
+                            st.subheader(selected_key.replace("_", " ").title())
+                            st.table(pd.DataFrame(list(res.items()), columns=["Metric", "Value"]))
+                    except Exception as exc:
+                        st.warning(f"Could not execute {selected_key}: {exc}")
+        else:
+            st.caption("No additional relevant tests identified for this objective and column pair.")
 
     if st.button("⬅ Back"):
         st.session_state.step = "statistics"
