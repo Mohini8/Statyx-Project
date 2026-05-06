@@ -66,6 +66,9 @@ class CleanRequest(DatasetPayload):
 
 class AiRequest(DatasetPayload):
     objective: Optional[str] = None
+    target_col: Optional[str] = None
+    group_col: Optional[str] = None
+    additional_tests: Optional[List[str]] = None
 
 
 class VisualizationRequest(DatasetPayload):
@@ -102,7 +105,7 @@ def encode_png(fig) -> str:
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-def compute_objective_tests(df: pd.DataFrame, objective: str) -> List[Dict[str, Any]]:
+def compute_objective_tests(df: pd.DataFrame, objective: str, target_col: Optional[str] = None, group_col: Optional[str] = None, additional_tests: Optional[List[str]] = None) -> Dict[str, Any]:
     objective_embedding = MODEL.encode([f"passage: {objective}"], convert_to_numpy=True)[0]
     scores = [
         (name, float(np.dot(objective_embedding, TEST_EMBEDDINGS[i]) /
@@ -112,6 +115,7 @@ def compute_objective_tests(df: pd.DataFrame, objective: str) -> List[Dict[str, 
     scores.sort(key=lambda item: item[1], reverse=True)
 
     results = []
+    extra_candidates = []
     numeric_cols = list(df.select_dtypes(include=[np.number]).columns)
     cat_cols = list(df.select_dtypes(include=["object", "category"]).columns)
 
@@ -163,12 +167,16 @@ def compute_objective_tests(df: pd.DataFrame, objective: str) -> List[Dict[str, 
 
         return None
 
-    combination_map = {
+    if target_col and group_col and target_col in df.columns and group_col in df.columns and target_col != group_col:
+        forced_pairs = {name: [(target_col, group_col)] for name in TEST_NAMES}
+        combination_map = forced_pairs
+    else:
+        combination_map = {
         "pearson_correlation": [(numeric_cols[i], numeric_cols[j]) for i in range(len(numeric_cols)) for j in range(i + 1, len(numeric_cols))],
         "chi_square": [(cat_cols[i], cat_cols[j]) for i in range(len(cat_cols)) for j in range(i + 1, len(cat_cols))],
         "independent_t_test": [(num, cat) for num in numeric_cols for cat in cat_cols],
         "anova": [(num, cat) for num in numeric_cols for cat in cat_cols],
-    }
+        }
 
     seen_tests = set()
     for test_name, confidence in scores:
@@ -228,14 +236,52 @@ def compute_objective_tests(df: pd.DataFrame, objective: str) -> List[Dict[str, 
             if len(results) >= 3:
                 break
 
+    for test_name, confidence in scores:
+        if len(extra_candidates) >= 12:
+            break
+        if test_name in {item.get("test_key") for item in results}:
+            continue
+        extra_candidates.append({"test_key": test_name, "confidence": round(float(confidence), 3)})
+
+    additional_results: List[Dict[str, Any]] = []
+    requested = additional_tests or []
+    if requested:
+        for key in requested:
+            for cols in combination_map.get(key, []):
+                out = run_test(key, cols)
+                if out:
+                    additional_results.append({
+                        "test_key": key,
+                        "test": f"{key.replace('_', ' ').title()} ({cols[0]} vs {cols[1]})",
+                        "result": out,
+                    })
+                    break
+
     if not results:
         results.append({
             "test": "No suitable test found",
+            "test_key": "none",
             "confidence": 0.0,
             "result": {"error": "Unable to infer an analysis from the current dataset."}
         })
 
-    return results
+    for item in results:
+        item.setdefault("test_key", item["test"].split(" (")[0].strip().lower().replace(" ", "_"))
+
+    inferred_target = target_col
+    inferred_group = group_col
+    if not inferred_target or inferred_target not in df.columns:
+        inferred_target = numeric_cols[0] if numeric_cols else (cat_cols[0] if cat_cols else None)
+    if not inferred_group or inferred_group not in df.columns or inferred_group == inferred_target:
+        inferred_group = cat_cols[0] if cat_cols else (numeric_cols[1] if len(numeric_cols) > 1 else None)
+
+    return {
+        "top_tests": results[:5],
+        "additional_test_options": extra_candidates,
+        "additional_test_results": additional_results,
+        "target": inferred_target,
+        "group": inferred_group,
+    }
 
 
 @app.post("/api/python/upload")
@@ -376,8 +422,14 @@ def ai_insights(request: AiRequest) -> JSONResponse:
     df = normalize_dataframe(pd.DataFrame(request.rows))
     insights = generate_auto_insights(df)
     objective = request.objective or ""
-    tests = compute_objective_tests(df, objective) if objective else []
-    return JSONResponse(content=jsonable_encoder({"insights": insights, "tests": tests, "columns": list(df.columns)}))
+    analysis = compute_objective_tests(
+        df,
+        objective,
+        request.target_col,
+        request.group_col,
+        request.additional_tests,
+    ) if objective else {"top_tests": [], "additional_test_options": [], "additional_test_results": [], "target": request.target_col, "group": request.group_col}
+    return JSONResponse(content=jsonable_encoder({"insights": insights, "tests": analysis["top_tests"], "additionalTests": analysis["additional_test_options"], "additionalTestResults": analysis["additional_test_results"], "target": analysis["target"], "group": analysis["group"], "columns": list(df.columns)}))
 
 
 @app.post("/api/python/cross-tab")
