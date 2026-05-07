@@ -32,7 +32,8 @@ def _is_test_applicable(df, test_key, target, group):
         return _is_categorical(target_s) and _is_categorical(group_s)
 
     if test_key in {"independent_t_test", "mann_whitney_u", "cohens_d", "hedges_g"}:
-        return target_num and _is_categorical(group_s) and group_levels == 2
+        # These implementations compare two numeric columns directly, not numeric target + categorical group labels.
+        return target_num and group_num
 
     if test_key in {"anova", "kruskal_wallis"}:
         return target_num and _is_categorical(group_s) and group_levels > 2

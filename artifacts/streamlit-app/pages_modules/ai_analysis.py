@@ -58,9 +58,23 @@ def render():
 
         if result is None:
             st.error("Could not infer columns")
-            st.stop()
+            st.session_state.ai_analysis_result = None
+        else:
+            valid_results, target, group, additional_tests = result
+            st.session_state.ai_analysis_result = {
+                "valid_results": valid_results,
+                "target": target,
+                "group": group,
+                "additional_tests": additional_tests,
+            }
 
-        valid_results, target, group, additional_tests = result
+    analysis_state = st.session_state.get("ai_analysis_result")
+
+    if analysis_state:
+        valid_results = analysis_state["valid_results"]
+        target = analysis_state["target"]
+        group = analysis_state["group"]
+        additional_tests = analysis_state["additional_tests"]
 
         st.info(f"Selected columns → target: **{target}**, relevant/group: **{group}**")
 
@@ -93,7 +107,8 @@ def render():
             ]
             selected = st.multiselect(
                 "Select any additional tests to execute",
-                options=available_options
+                options=available_options,
+                key="ai_additional_selected_tests"
             )
 
             if st.button("Run Selected Additional Tests"):
