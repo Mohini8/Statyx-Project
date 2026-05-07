@@ -3,28 +3,33 @@ import numpy as np
 from scipy.stats import chi2_contingency, pearsonr, ttest_ind, f_oneway
 import statsmodels.api as sm
 
-def bin_numeric_variable(series, n_bins=5):
-    """Bin a numeric variable into categorical ranges."""
-    return pd.cut(series, bins=n_bins, duplicates='drop')
+def infer_column_type(series: pd.Series) -> str:
+    non_null = series.dropna().astype(str)
+    if len(non_null) == 0:
+        return "categorical"
+
+    def looks_numeric(x: str) -> bool:
+        try:
+            float(x)
+            return True
+        except Exception:
+            return False
+
+    numeric_ratio = non_null.apply(looks_numeric).mean()
+    return "numeric" if numeric_ratio >= 0.6 else "categorical"
 
 def cross_tab_analysis(df, row, col, prevalence=False):
-    row_is_numeric = pd.api.types.is_numeric_dtype(df[row])
-    col_is_numeric = pd.api.types.is_numeric_dtype(df[col])
-    
-    # Get actual cardinality
-    row_nunique = df[row].nunique()
-    col_nunique = df[col].nunique()
-    
-    # If numeric variable has too many unique values (continuous), bin it
-    if row_is_numeric and row_nunique > 10:
-        df = df.copy()
-        df[row] = bin_numeric_variable(df[row])
-        row_is_numeric = False
-    
-    if col_is_numeric and col_nunique > 10:
-        df = df.copy()
-        df[col] = bin_numeric_variable(df[col])
-        col_is_numeric = False
+    if row not in df.columns or col not in df.columns:
+        return {"error": "Selected row/column not found in dataset."}
+
+    row_is_numeric = infer_column_type(df[row]) == "numeric"
+    col_is_numeric = infer_column_type(df[col]) == "numeric"
+
+    df = df.copy()
+    if row_is_numeric:
+        df[row] = pd.to_numeric(df[row], errors="coerce")
+    if col_is_numeric:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
     results = {}
 
@@ -143,7 +148,7 @@ def cross_tab_analysis(df, row, col, prevalence=False):
             # ---- Logistic regression if categorical is binary
             if data[group_var].nunique() == 2:
                 try:
-                    y = pd.get_dummies(data[group_var], drop_first=True)
+                    y = pd.get_dummies(data[group_var], drop_first=True).iloc[:, 0]
                     X = sm.add_constant(data[numeric_var])
 
                     model = sm.Logit(y, X).fit(disp=False)
