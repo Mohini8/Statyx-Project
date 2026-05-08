@@ -105,6 +105,20 @@ def encode_png(fig) -> str:
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
+def _to_native_json(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(k): _to_native_json(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_to_native_json(v) for v in value]
+    if isinstance(value, tuple):
+        return [_to_native_json(v) for v in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, pd.Timestamp):
+        return value.isoformat()
+    return value
+
+
 def compute_objective_tests(df: pd.DataFrame, objective: str, target_col: Optional[str] = None, group_col: Optional[str] = None, additional_tests: Optional[List[str]] = None) -> Dict[str, Any]:
     objective_embedding = MODEL.encode([f"passage: {objective}"], convert_to_numpy=True)[0]
     scores = [
@@ -330,25 +344,25 @@ def apply_cleaning(request: CleanRequest) -> JSONResponse:
         if action.dtype == "numeric":
             df[action.column] = pd.to_numeric(df[action.column], errors="coerce")
             if action.method == "mean":
-                df[action.column].fillna(df[action.column].mean(), inplace=True)
+                df[action.column] = df[action.column].fillna(df[action.column].mean())
             elif action.method == "median":
-                df[action.column].fillna(df[action.column].median(), inplace=True)
+                df[action.column] = df[action.column].fillna(df[action.column].median())
             elif action.method == "zero":
-                df[action.column].fillna(0, inplace=True)
+                df[action.column] = df[action.column].fillna(0)
             elif action.method == "custom" and action.custom is not None:
                 try:
-                    df[action.column].fillna(float(action.custom), inplace=True)
+                    df[action.column] = df[action.column].fillna(float(action.custom))
                 except Exception:
-                    df[action.column].fillna(action.custom, inplace=True)
+                    df[action.column] = df[action.column].fillna(action.custom)
         else:
             numeric_mask = df[action.column].apply(is_numeric_like)
             df.loc[numeric_mask, action.column] = pd.NA
             if action.method == "mode":
                 mode_val = df[action.column].mode()
                 if len(mode_val) > 0:
-                    df[action.column].fillna(mode_val[0], inplace=True)
+                    df[action.column] = df[action.column].fillna(mode_val[0])
             elif action.method == "custom" and action.custom is not None:
-                df[action.column].fillna(str(action.custom), inplace=True)
+                df[action.column] = df[action.column].fillna(str(action.custom))
 
     if any(action.column == "__duplicates__" for action in request.actions):
         df = df.drop_duplicates()
@@ -448,6 +462,7 @@ def cross_tab(request: CrossTabRequest) -> JSONResponse:
         # Already dict
         pass
 
+    result = _to_native_json(result)
     return JSONResponse(content=jsonable_encoder({"result": result}))
 
 
